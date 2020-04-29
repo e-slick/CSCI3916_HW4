@@ -1,21 +1,23 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 var bcrypt = require('bcrypt-nodejs');
-//TODO: Review https://mongoosejs.com/docs/validation.html
 
 mongoose.Promise = global.Promise;
 
-mongoose.connect(process.env.DB, { useNewUrlParser: true} );
+mongoose.connect(process.env.DB, { useNewUrlParser: true, useUnifiedTopology : true } );
 mongoose.set('useCreateIndex', true);
 
-// movie schema
+
 var MovieSchema = new Schema({
     title: {type: String, required: true},
-    releaseDate: {type: String, required: true},
+    year_released: {type: String, required: true},
     genre: {type: String, required: true},
-    actorName: {type: Array, required: true},
-    charName: {type: Array, required: true}
+    actor_name: {type: Array, required: true},
+    character_name: {type: Array, required: true},
+    ID: {type: Number, required: true},
+    movie_URL: {type: String, required: true}
 });
 
-var Movie = mongoose.model('Movies', MovieSchema);
-module.exports  = Movie;
+
+// return the model
+module.exports = mongoose.model('Movie', MovieSchema);
