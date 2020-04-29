@@ -19,33 +19,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(passport.initialize());
 
 var router = express.Router();
-const GA_TRACKING_ID = process.env.GA_KEY;
-
-function trackDimension(category, action, label, value, dimension, metric) {
-    var options = { method: 'GET',
-        url: 'https://www.google-analytics.com/collect',
-        qs:
-            {
-                v: '1',
-                tid: GA_TRACKING_ID,
-                cid: crypto.randomBytes(16).toString("hex"),
-                t: 'event',
-                ec: category,
-                ea: action,
-                el: label,
-                ev: value,
-                cd1: dimension,
-                cm1: metric
-            },
-        headers:
-            {  'Cache-Control': 'no-cache' } };
-    return rp(options);
-}
-
 
 router.route('/test')
     .get(function (req, res) {
-        trackDimension('Testing', 'Rating', 'Feedback for Movie', '5', 'Guardians of the Galaxy 2', '1')
             .then(function (response) {
                 console.log(response.body);
                 res.status(200).send('Event Successful.').end();
@@ -111,7 +87,6 @@ router.post('/signup', function(req, res) {
 
 router.post('/signin', function(req, res) {
     var userNew = new User();
-    //userNew.name = req.body.name;
     userNew.username = req.body.username;
     userNew.password = req.body.password;
 
@@ -147,7 +122,6 @@ router.route('/movies/:reviews?')
               movies.actor_name = req.body.actor_name;
               movies.character_name = req.body.character_name;
               movies.ID = req.body.ID;
-              //try to save the movie schema into our database
               movies.save(function (err) {
                   if (err) {
                       return res.send(err);
@@ -168,7 +142,6 @@ router.route('/movies/:reviews?')
             res.json({success: false, messsage: 'Required fields: Title, Release Date, Genre, Actors.'});
         }
     })
-    // Returning all movies with a review
     .get(authJwtController.isAuthenticated, function (req, res) {
         if(req.query.reviews && req.query.moviename === undefined){
             Movie.aggregate()
@@ -286,7 +259,6 @@ router.route('/review')
                     review.review = req.body.review;
                     review.rating = req.body.rating;
                     review.ID = req.body.ID;
-                    trackDimension(docs[0]._doc.genre, 'post/review', 'POST', review.rating, docs[0]._doc.title, '1')
                     review.save(function (err) {
                         if (err) {
                             return res.send(err);
