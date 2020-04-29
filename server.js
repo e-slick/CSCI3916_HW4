@@ -9,6 +9,7 @@ var jwt = require('jsonwebtoken');
 var cors = require('cors');
 const crypto = require("crypto");
 var rp = require('request-promise');
+require('dotenv').config({ path:'.env'});
 
 var app = express();
 module.exports = app;
@@ -20,14 +21,15 @@ app.use(passport.initialize());
 
 var router = express.Router();
 
+/*
 router.route('/test')
     .get(function (req, res) {
-            .then(function (response) {
+            then(function (response) {
                 console.log(response.body);
                 res.status(200).send('Event Successful.').end();
             })
     });
-
+*/
 
 router.route('/postjwt')
     .post(authJwtController.isAuthenticated, function (req, res) {
