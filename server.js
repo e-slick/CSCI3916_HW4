@@ -3,13 +3,15 @@ var bodyParser = require('body-parser');
 var passport = require('passport');
 var authJwtController = require('./auth_jwt');
 var User = require('./Users');
+var Movie = require('./Movies');
+var Review = require('./Reviews');
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
-
-var Movie = require('./Movies');
+const crypto = require("crypto");
+var rp = require('request-promise');
 
 var app = express();
-module.exports = app; // for testing
+module.exports = app;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -17,6 +19,39 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(passport.initialize());
 
 var router = express.Router();
+const GA_TRACKING_ID = process.env.GA_KEY;
+
+function trackDimension(category, action, label, value, dimension, metric) {
+    var options = { method: 'GET',
+        url: 'https://www.google-analytics.com/collect',
+        qs:
+            {
+                v: '1',
+                tid: GA_TRACKING_ID,
+                cid: crypto.randomBytes(16).toString("hex"),
+                t: 'event',
+                ec: category,
+                ea: action,
+                el: label,
+                ev: value,
+                cd1: dimension,
+                cm1: metric
+            },
+        headers:
+            {  'Cache-Control': 'no-cache' } };
+    return rp(options);
+}
+
+
+router.route('/test')
+    .get(function (req, res) {
+        trackDimension('Testing', 'Rating', 'Feedback for Movie', '5', 'Guardians of the Galaxy 2', '1')
+            .then(function (response) {
+                console.log(response.body);
+                res.status(200).send('Event Successful.').end();
+            })
+    });
+
 
 router.route('/postjwt')
     .post(authJwtController.isAuthenticated, function (req, res) {
@@ -52,7 +87,7 @@ router.route('/users')
 
 router.post('/signup', function(req, res) {
     if (!req.body.username || !req.body.password) {
-        res.json({success: false, message: 'Please pass username and password.'});
+        res.json({success: false, message: 'You must enter a username and password.'});
     }
     else {
         var user = new User();
@@ -64,18 +99,19 @@ router.post('/signup', function(req, res) {
             if (err) {
                 // duplicate entry
                 if (err.code == 11000)
-                    return res.json({ success: false, message: 'A user with that username already exists. '});
+                    return res.json({ success: false, message: 'That username is taken. '});
                 else
                     return res.send(err);
             }
 
-            res.json({ success: true, message: 'User created!' });
+            res.json({ success: true, message: 'Success!' });
         });
     }
 });
 
 router.post('/signin', function(req, res) {
     var userNew = new User();
+    //userNew.name = req.body.name;
     userNew.username = req.body.username;
     userNew.password = req.body.password;
 
@@ -89,7 +125,7 @@ router.post('/signin', function(req, res) {
                 res.json({success: true, token: 'JWT ' + token});
             }
             else {
-                res.status(401).send({success: false, message: 'Authentication failed.'});
+                res.status(401).send({success: false, message: 'Wrong username or password.'});
             }
         });
 
@@ -97,78 +133,133 @@ router.post('/signin', function(req, res) {
     });
 });
 
-router.post('/movies', authJwtController.isAuthenticated, function(req, res){
-        if (req.body.releaseDate || req.body.title || req.body.genre){
-            if(Object.keys(req.body.actorName).length < 3 || Object.keys(req.body.charName).length < 3){
-                res.json({success: false, message: 'Actor/Character array requires 3 attributes'});
+router.route('/movies/:reviews?')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        if (req.body.title && req.body.year_released && req.body.genre){
+          if(Object.keys(req.body.actor_name).length < 3 || Object.keys(req.body.character_name).length < 3){
+              res.json({success: false, message: 'Arrays must contain 3 values.'});
             }
-            else {
-                var movies = new Movie();
-                movies.releaseDate = req.body.releaseDate;
-                movies.title = req.body.title;
-                movies.genre = req.body.genre;
-                movies.actorName = req.body.actorName;
-                movies.charName = req.body.charName;
-                movies.save(function (err) {
-                    if (err) {
-                        return res.send(err);
-                    }
-                    else {
-                        res.status(200).send({
-                            status: 200,
-                            msg: 'Saved successfully.',
-                            headers: req.headers,
-                            query: req.query,
-                            env: process.env.UNIQUE_KEY
-                        });
-                    }
-                });
-            }
+          else {
+              var movies = new Movie();
+              movies.title = req.body.title;
+              movies.year_released = req.body.year_released;
+              movies.genre = req.body.genre;
+              movies.actor_name = req.body.actor_name;
+              movies.character_name = req.body.character_name;
+              movies.ID = req.body.ID;
+              //try to save the movie schema into our database
+              movies.save(function (err) {
+                  if (err) {
+                      return res.send(err);
+                  }
+                  else {
+                      res.status(200).send({
+                          status: 200,
+                          msg: 'Movie saved.',
+                          headers: req.headers,
+                          query: req.query,
+                          env: process.env.UNIQUE_KEY
+                      });
+                  }
+              });
+          }
         }
         else{
-            res.json({success: false, message: 'Title, Release Date, Genre and Actors fields all required.'});
+            res.json({success: false, messsage: 'Required fields: Title, Release Date, Genre, Actors.'});
         }
     })
-router.get('/movies', authJwtController.isAuthenticated, function (req, res) {
-        Movie.find(function (err, result) {
-            if (err) {
-                return res.send(err);
-            }
-            else{
-                res.send(result);
-            }
-        }); })
-
-router.put('/movies', authJwtController.isAuthenticated, function (req, res) {
-        if(Object.keys(req.body.newInfo).length == 2){
-            var arrMovies = req.body.newInfo;
-            var mTitle = arrMovies[0].title;
-            Movie.findOne({title: mTitle}, function (err, result) {
-                if (err) {
-                    return res.send(err);
-                }
-                else{
-                    if(result == null){
-                        res.send("That movie doesn't exist in the database.");
-                    }
-                    else{
-                        result.title = req.body.new_title;
-                        Movie.update({title: mTitle}, arrMovies[1], function (err, raw) {
-                            if(err){
-                                res.send(err);
-                            }
-                            res.send("Movie updated.");
-                        });
-                    }
-                }
-            })
+    // Returning all movies with a review
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        if(req.query.reviews && req.query.moviename === undefined){
+            Movie.aggregate()
+                .match({ID: {$gte: 1}})
+                .lookup({from: 'reviews', localField: 'ID', foreignField: 'ID', as: 'reviews'})
+                .exec(function (err, movie) {
+                    res.send(movie);
+                })
         }
         else {
-            res.send("Enter the movie title to find. Then enter the updated title.");
+            Movie.find(function (err, result) {
+                if (err) {
+                    return res.send(err);
+                } else {
+                    if (req.query.moviename) {
+                        let jsonToSend;
+                        var movieJson;
+                        var reviewJson;
+                        var movie_found = false;
+                        for (let i = 0; i < result.length; ++i) {
+                            if (req.query.moviename === result[i]._doc.title) {
+                                movieJson = result[i]._doc;
+                                movie_found = true;
+                                break;
+                            }
+                        }
+                        if (movie_found === false) {
+                            res.send("No movies exists with that title!");
+                            return;
+                        }
+                        if (req.query.reviews === "true") {
+                            Review.find(function (err, result) {
+                                if (err) {
+                                    return res.send(err);
+                                } else {
+                                    var review_found = false;
+                                    for (let i = 0; i < result.length; ++i) {
+                                        if (movieJson.ID === result[i]._doc.ID) {
+                                            reviewJson = result[i]._doc;
+                                            review_found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (review_found) {
+                                        jsonToSend = Object.assign(movieJson, reviewJson);
+                                    } else {
+                                        var tempJson = {"msg": "No reviews found for this movie!"};
+                                        jsonToSend = Object.assign(movieJson, tempJson);
+                                    }
+                                    res.send(jsonToSend);
+                                }
+                            })
+                        } else {
+                            res.send(movieJson);
+                        }
+                    } else {
+                        res.send(result);
+                    }
+                }
+            });
         }
     })
-
-router.delete('/movies', authJwtController.isAuthenticated, function(req,res){
+    .put(authJwtController.isAuthenticated, function (req, res) {
+        if(Object.keys(req.body.updatingJson).length == 2){
+            var movie_array = req.body.updatingJson;
+            var movie_title = movie_array[0].title;
+          Movie.findOne({title: movie_title}, function (err, result) {
+              if (err) {
+                  return res.send(err);
+              }
+              else{
+                  if(result == null){
+                      res.send("No matching movies.");
+                  }
+                  else{
+                      result.title = req.body.new_title;
+                      Movie.update({title: movie_title}, movie_array[1], function (err, raw) {
+                          if(err){
+                              res.send(err);
+                          }
+                          res.send("Movie updated.");
+                      });
+                  }
+              }
+          })
+        }
+        else{
+            res.send("Enter a title and the title you'd like to replace it with.");
+        }
+    })
+    .delete(authJwtController.isAuthenticated, function(req,res){
         if(req.body.title){
             Movie.deleteOne({title: req.body.title}, function (err, raw) {
                 if(err){
@@ -178,12 +269,59 @@ router.delete('/movies', authJwtController.isAuthenticated, function(req,res){
             });
         }
         else{
-            res.send("Enter your movie title.");
+            res.send("Enter a movie title.");
         }
     })
+    .all(function (req, res) {
+        res.status(405).send({msg: 'Invalid method.'});
+    });
 
-router.all(function (req, res) {
-        res.status(405).send({msg: 'HTTP method not supported.'});
+router.route('/review')
+    .post(authJwtController.isAuthenticated, function(req, res){
+        if(req.body.name && req.body.review && req.body.rating && req.body.ID){
+            Movie.find({ID : parseInt(req.body.ID)}, null, function (err, docs) {
+                if(docs.length > 0) {
+                    var review = new Review();
+                    review.name = req.body.name;
+                    review.review = req.body.review;
+                    review.rating = req.body.rating;
+                    review.ID = req.body.ID;
+                    trackDimension(docs[0]._doc.genre, 'post/review', 'POST', review.rating, docs[0]._doc.title, '1')
+                    review.save(function (err) {
+                        if (err) {
+                            return res.send(err);
+                        } else {
+                            res.status(200).send({
+                                status: 200,
+                                msg: 'Review saved.',
+                                headers: req.headers,
+                                query: req.query,
+                                env: process.env.UNIQUE_KEY
+                            });
+                        }
+                    });
+                }
+                else{
+                    res.status(400).send({success: false, message: 'No matching movies.'});
+                }
+            });
+        }
+        else{
+            res.status(400).send({success: false, message: 'Required fiels: Name, Review, Rating, Movie ID'});
+        }
+    })
+    .get(function(req,res){
+        Review.find(function (err, result) {
+            if (err) {
+                return res.send(err);
+            }
+            else{
+                res.send(result);
+            }
+        });
+    })
+    .all(function (req, res) {
+        res.status(405).send({msg: 'Invalid Method.'});
     });
 
 
