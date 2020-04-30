@@ -21,16 +21,6 @@ app.use(passport.initialize());
 
 var router = express.Router();
 
-/*
-router.route('/test')
-    .get(function (req, res) {
-            then(function (response) {
-                console.log(response.body);
-                res.status(200).send('Event Successful.').end();
-            })
-    });
-*/
-
 router.route('/postjwt')
     .post(authJwtController.isAuthenticated, function (req, res) {
             console.log(req.body);
@@ -112,6 +102,7 @@ router.post('/signin', function(req, res) {
 
 router.route('/movies/:reviews?')
     .post(authJwtController.isAuthenticated, function (req, res) {
+        console.log(req.body.title);
         if (req.body.title && req.body.year_released && req.body.genre){
           if(Object.keys(req.body.actor_name).length < 3 || Object.keys(req.body.character_name).length < 3){
               res.json({success: false, message: 'Arrays must contain 3 values.'});
@@ -222,7 +213,6 @@ router.route('/movies/:reviews?')
                          res.send("Movie updated.");
                       });
                   }
-              //}
           })
         }
         else{
@@ -249,8 +239,9 @@ router.route('/movies/:reviews?')
 router.route('/review')
     .post(authJwtController.isAuthenticated, function(req, res){
         if(req.body.name && req.body.review && req.body.rating && req.body.ID){
+            console.log("here")
             Movie.find({ID : parseInt(req.body.ID)}, null, function (err, docs) {
-                if(docs.length > 0) {
+                if(req.body.length > 0) {
                     var review = new Review();
                     review.name = req.body.name;
                     review.review = req.body.review;

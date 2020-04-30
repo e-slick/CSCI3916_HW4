@@ -1,7 +1,7 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 var bcrypt = require('bcrypt-nodejs');
-//require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: '.env' });
 
 mongoose.Promise = global.Promise;
 
@@ -16,7 +16,7 @@ var MovieSchema = new Schema({
     actor_name: {type: Array, required: true},
     character_name: {type: Array, required: true},
     ID: {type: Number, required: true},
-    movie_URL: {type: String, required: true}
+    movie_URL: {type: String, required: false}
 });
 
 
