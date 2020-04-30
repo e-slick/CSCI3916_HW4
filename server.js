@@ -215,19 +215,14 @@ router.route('/movies/:reviews?')
                   return res.send(err);
               }
               else{
-                  if(result == null){
-                      res.send("No matching movies.");
-                  }
-                  else{
-                      result.title = req.body.new_title;
-                      Movie.update({title: movie_title}, movie_array[1], function (err, raw) {
-                          if(err){
-                              res.send(err);
-                          }
-                          res.send("Movie updated.");
+                   Movie.update({title: movie_title}, movie_array[1], function (err, raw) {
+                     if(err){
+                         res.send(err);
+                     }
+                         res.send("Movie updated.");
                       });
                   }
-              }
+              //}
           })
         }
         else{
